@@ -1,15 +1,36 @@
 # pdf-rag-chat
 
-This is a small Streamlit app that lets you upload a PDF and ask questions about its content. Under the hood it follows a fairly standard RAG (retrieval-augmented generation) setup: the text from the PDF is split into chunks, indexed using embeddings in a FAISS vector store, and when you ask a question the most relevant chunks are retrieved and passed as context to a language model to generate the answer.
+A small Streamlit app for asking questions about an uploaded PDF using retrieval-augmented generation (RAG). Embeddings run locally, so indexing a document needs no API calls. OpenAI is called only to write the final answer.
 
-One deliberate design choice is that embeddings are generated locally using HuggingFace sentence transformers. This means indexing a document does not require any external API calls or cost. OpenAI is only used at the final step, when generating the natural-language answer based on the retrieved context.
+The interface and the answers are in Swedish.
 
----
+## How it works
 
-## Running the project
+1. **Extract**: PyPDF2 reads the text of every page. Scanned (image-only) PDFs yield no text and are rejected with a warning.
+2. **Chunk**: LangChain's `CharacterTextSplitter` splits the text on newlines into chunks of 1000 characters with 200 characters of overlap.
+3. **Embed**: chunks are embedded locally with the HuggingFace sentence-transformers model `all-MiniLM-L6-v2`.
+4. **Index**: the vectors go into an in-memory FAISS index, cached per file by its SHA-256 hash so reruns don't rebuild it.
+5. **Retrieve**: the top *k* chunks for the question are fetched (k is 1–10, default 4, set in the sidebar).
+6. **Answer**: the chunks and the question go to OpenAI through LangChain's `ChatOpenAI` (temperature 0). The prompt tells the model to answer only from that context and to say so when the answer isn't there. The retrieved chunks can be shown as sources.
 
-Clone the repository and move into the project directory:
+## Tech stack
+
+Python, Streamlit, LangChain, FAISS, sentence-transformers (HuggingFace), OpenAI API, PyPDF2.
+
+## Getting started
+
+Prerequisites: Python 3 and an OpenAI API key.
 
 ```bash
 git clone https://github.com/SimonC03/pdf-rag-chat.git
 cd pdf-rag-chat
+pip install streamlit python-dotenv PyPDF2 langchain-community langchain-openai langchain-text-splitters faiss-cpu sentence-transformers
+```
+
+Set `OPENAI_API_KEY`, either in a `.env` file in the project root or as an exported environment variable. Then start the app:
+
+```bash
+streamlit run app.py
+```
+
+The first run downloads the embedding model from HuggingFace.
